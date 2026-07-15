@@ -2,6 +2,9 @@
 
 Minimal reproducer for a behavioral regression introduced in GWT **2.13.0**.
 
+**Live demo (no build needed):** https://jornc.github.io/gwt-2.13-undefined-null-repro/ - the same
+module compiled under both GWT versions, running side by side in the browser.
+
 ## Summary
 
 Reading an **absent** JS property (`undefined`) through a native `@JsType(isNative = true)`
@@ -73,12 +76,18 @@ Effect:
 - **2.12:** the JSNI barrier blocked nullability analysis, so the boxed `Double` stayed
   "can be null" → `maskUndefined` was applied → `undefined` coerced to `null` → `== null` **true**.
 - **2.13:** `uncheckedCast` is inlined, so type-tightening traces the value back to a primitive
-  `double` (inherently non-null) → the boxed `Double` is tightened to non-null →
-  `canBeNull` is false → `maskUndefined` is **skipped** → raw `undefined` reaches the `==` →
-  `== null` **false**.
+  `double` (inherently non-null) → the boxed `Double` is tightened to **non-null**. Now
+  `DeadCodeElimination` constant-folds `boxed == null` straight to the literal `false` (a boxed
+  non-null value is never null), before any undefined→null normalization runs. So the JS
+  `undefined` is never coerced and `== null` is **false**. (The same non-null typing also skips the
+  `Cast.maskUndefined` coercion in `EqualityNormalizer`, which bites additional mixed-type
+  comparisons; but for `getX() == null` the constant-fold is the operative step.)
 
-This also explains why it is optimized-compile-only: inlining + type-tightening do not run in
-SuperDevMode, so the barrier survives there and the coercion still happens.
+The constant-fold is directly observable: `run.sh` shows that on 2.13.1 the compiler bakes the
+result into the emitted string, whereas 2.12.1 computes it at runtime.
+
+This also explains why it is optimized-compile-only: inlining, type-tightening, and dead-code
+elimination do not run in SuperDevMode, so the barrier survives there and the coercion still happens.
 
 ## Workaround
 
@@ -88,6 +97,13 @@ reference (stays `canBeNull`), so `maskUndefined` is still emitted:
 ```java
 private Double value;   // instead of: private double value;
 ```
+
+## Live demo / GitHub Pages
+
+`docs/` is a ready-to-serve GitHub Pages site: a single static page that iframes both compiled
+apps (`docs/app/2.12.1` and `docs/app/2.13.1`) and reports the flip. Rebuild it with
+`./build-pages.sh`; serve locally with `(cd docs && python3 -m http.server)`. Pages is served from
+the `main` branch `/docs` folder.
 
 ## Environment
 

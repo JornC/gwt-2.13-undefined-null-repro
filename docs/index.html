@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GWT 2.13: undefined leaks past == null</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --ink: #1a1d21; --muted: #5b6570;
+    --line: #e3e7ec; --ok: #1a7f45; --ok-bg: #e7f6ec; --bad: #c0341d; --bad-bg: #fbe9e6;
+    --code-bg: #1e242b; --code-ink: #e7ebef; --accent: #2b6cb0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 40px 0 14px; }
+  .lede { color: var(--muted); margin: 0 0 24px; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .verdict {
+    border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px;
+    background: var(--card); padding: 14px 18px; margin: 0 0 28px; font-weight: 600;
+  }
+  .verdict.pending { border-left-color: #c98a00; }
+  .verdict.confirmed { border-left-color: var(--bad); background: var(--bad-bg); }
+  .verdict small { display: block; font-weight: 400; color: var(--muted); margin-top: 3px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .panel header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  .ver { font-weight: 700; }
+  .tag { font-size: 12px; color: var(--muted); }
+  .badge { font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .badge.wait { background: #eef1f4; color: var(--muted); }
+  .badge.ok { background: var(--ok-bg); color: var(--ok); }
+  .badge.bad { background: var(--bad-bg); color: var(--bad); }
+  iframe { width: 100%; height: 72px; border: 0; display: block; background: #fff; }
+  .framenote { padding: 8px 16px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
+
+  pre.code {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55; margin: 0 0 16px;
+  }
+  .hl-cmt { color: #7d8a99; font-style: italic; }
+  .hl-str { color: #9ece6a; }
+  .hl-ann { color: #e0af68; }
+  .hl-kw  { color: #7aa2f7; }
+  .hl-typ { color: #7dcfff; }
+  .filetab { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  .expected { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+  .foot { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  .foot p { margin: 0 0 10px; }
+  kbd { background: #eef1f4; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GWT 2.13: <span class="mono">undefined</span> leaks past <span class="mono">== null</span></h1>
+  <p class="lede">
+    The identical module, compiled under two GWT versions. A native-JsType primitive field holds an
+    absent JS property (<span class="mono">undefined</span>); its autoboxed value is null-checked.
+    The optimized compile disagrees on the answer.
+  </p>
+
+  <div id="verdict" class="verdict pending">
+    Running both compilations&hellip;
+    <small>Each box below is a live GWT app; its own compiler decided the result.</small>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <header><span class="ver">GWT 2.12.1</span><span class="badge wait" id="b-2121">waiting&hellip;</span></header>
+      <iframe id="f-2121" src="app/2.12.1/index.html" title="GWT 2.12.1 output"></iframe>
+      <div class="framenote">Baseline &mdash; expected <span class="mono">true</span>.</div>
+    </div>
+    <div class="panel">
+      <header><span class="ver">GWT 2.13.1</span><span class="badge wait" id="b-2131">waiting&hellip;</span></header>
+      <iframe id="f-2131" src="app/2.13.1/index.html" title="GWT 2.13.1 output"></iframe>
+      <div class="framenote">Regressed &mdash; returns <span class="mono">false</span>.</div>
+    </div>
+  </div>
+
+  <h2>The code, in full</h2>
+  <p class="filetab" id="tab-native">NativeObj.java</p>
+  <pre class="code"><code id="src-native">loading&hellip;</code></pre>
+  <p class="filetab" id="tab-repro">Repro.java</p>
+  <pre class="code"><code id="src-repro">loading&hellip;</code></pre>
+  <p class="expected">
+    No configuration, no reflection &mdash; just a field read, an autobox, and a null check. Only the
+    GWT version differs between the two boxes above.
+  </p>
+
+  <div class="foot">
+    <p><strong>Root cause:</strong> GWT
+      <a href="https://github.com/gwtproject/gwt/pull/10165">PR&nbsp;#10165</a>
+      (commit&nbsp;<span class="mono">b5155aa</span>) made <span class="mono">JsUtils.uncheckedCast</span>
+      inlinable. The autobox <span class="mono">double&rarr;Double</span> runs through it, so after
+      inlining the optimizer proves the boxed value is non-null (it came from a primitive) and
+      constant-folds <span class="mono">boxed == null</span> to <span class="mono">false</span>.
+      The <span class="mono">undefined</span> that arrived from JS is never normalized to null.
+      Only the optimized/production compile is affected; SuperDevMode is not.</p>
+    <p><strong>Fix in your code:</strong> declare the native-overlay field as the boxed type
+      (<span class="mono">Double</span>, not <span class="mono">double</span>) so it is read as a
+      nullable reference.</p>
+    <p><strong>Reproduce locally:</strong> <span class="mono">./run.sh</span> compiles both versions and
+      prints the runtime and constant-fold signals. Source and README on
+      <a id="repo-link" href="#">GitHub</a>.</p>
+  </div>
+</div>
+
+<script>
+  function readFrame(id) {
+    try {
+      var doc = document.getElementById(id).contentDocument;
+      return doc && doc.body ? doc.body.innerText.trim() : '';
+    } catch (e) { return ''; }
+  }
+  function parse(t) {
+    if (/->\s*true/.test(t)) return true;
+    if (/->\s*false/.test(t)) return false;
+    return null;
+  }
+  function setBadge(id, val) {
+    var el = document.getElementById(id);
+    if (val === true)  { el.className = 'badge ok';  el.textContent = '== null → true ✓'; }
+    else if (val === false) { el.className = 'badge bad'; el.textContent = '== null → false ✗'; }
+  }
+  function poll() {
+    var a = parse(readFrame('f-2121'));
+    var b = parse(readFrame('f-2131'));
+    if (a !== null) setBadge('b-2121', a);
+    if (b !== null) setBadge('b-2131', b);
+    var v = document.getElementById('verdict');
+    if (a !== null && b !== null) {
+      if (a === true && b === false) {
+        v.className = 'verdict confirmed';
+        v.innerHTML = 'Regression reproduced - GWT 2.13.1 answers <span class="mono">false</span> where 2.12.1 answers <span class="mono">true</span>.' +
+          '<small>Same source, same optimized compile. The absent property (undefined) leaks past the null check on 2.13.</small>';
+      } else {
+        v.className = 'verdict';
+        v.innerHTML = 'Results: 2.12.1 = <span class="mono">' + a + '</span>, 2.13.1 = <span class="mono">' + b + '</span>.';
+      }
+      return;
+    }
+    setTimeout(poll, 200);
+  }
+  poll();
+
+  // Tiny self-contained Java highlighter (no external deps, works offline forever).
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function highlightJava(src) {
+    var re = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*")|(@\w+)|\b(package|import|public|private|protected|final|static|native|class|interface|extends|implements|return|new|this|void|boolean|int|double|long|float|char|byte|short|null|true|false|if|else|for|while|do|switch|case|break|continue|throw|throws|try|catch|finally|instanceof|abstract|enum|super)\b|\b([A-Z]\w*)\b/g;
+    var out = '', last = 0, m;
+    while ((m = re.exec(src))) {
+      out += escapeHtml(src.slice(last, m.index));
+      var cls = m[1] ? 'cmt' : m[2] ? 'str' : m[3] ? 'ann' : m[4] ? 'kw' : 'typ';
+      out += '<span class="hl-' + cls + '">' + escapeHtml(m[0]) + '</span>';
+      last = m.index + m[0].length;
+    }
+    return out + escapeHtml(src.slice(last));
+  }
+
+  // Show the real, compiled source.
+  function show(url, elId) {
+    fetch(url).then(function (r) { return r.text(); }).then(function (txt) {
+      document.getElementById(elId).innerHTML = highlightJava(txt.replace(/\s+$/, ''));
+    }).catch(function () { document.getElementById(elId).textContent = '(source unavailable)'; });
+  }
+  show('src/NativeObj.java', 'src-native');
+  show('src/Repro.java', 'src-repro');
+</script>
+</body>
+</html>
