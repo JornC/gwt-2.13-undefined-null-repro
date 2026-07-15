@@ -31,12 +31,13 @@
   .verdict.confirmed { border-left-color: var(--bad); background: var(--bad-bg); }
   .verdict small { display: block; font-weight: 400; color: var(--muted); margin-top: 3px; }
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
   .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .panel.fixed { border-color: #bfe2cb; }
   .panel header {
-    display: flex; align-items: baseline; justify-content: space-between;
-    padding: 12px 16px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px;
+    padding: 12px 14px; border-bottom: 1px solid var(--line);
   }
   .ver { font-weight: 700; }
   .tag { font-size: 12px; color: var(--muted); }
@@ -88,6 +89,11 @@
       <iframe id="f-2131" src="app/2.13.1/index.html" title="GWT 2.13.1 output"></iframe>
       <div class="framenote">Regressed &mdash; returns <span class="mono">false</span>.</div>
     </div>
+    <div class="panel fixed">
+      <header><span class="ver">2.13.1 + fix</span><span class="badge wait" id="b-fixed">waiting&hellip;</span></header>
+      <iframe id="f-fixed" src="app/2.13.1-fixed/index.html" title="GWT 2.13.1 patched output"></iframe>
+      <div class="framenote">Proposed patch &mdash; restored to <span class="mono">true</span>.</div>
+    </div>
   </div>
 
   <h2>The code, in full</h2>
@@ -112,6 +118,12 @@
     <p><strong>Fix in your code:</strong> declare the native-overlay field as the boxed type
       (<span class="mono">Double</span>, not <span class="mono">double</span>) so it is read as a
       nullable reference.</p>
+    <p><strong>Proposed compiler fix</strong> (third panel above): a one-line guard in
+      <span class="mono">JUnsafeTypeCoercion.getType()</span> that stops strengthening a coerced
+      <em>primitive</em> to non-null, so undefined-bearing values stay nullable &mdash; while keeping
+      #10165's inlining. That panel is the repro compiled with a
+      <span class="mono">gwt-dev-2.13.1</span> jar carrying only this
+      <a href="src/JUnsafeTypeCoercion.patch">patch</a>; it answers <span class="mono">true</span> again.</p>
     <p><strong>Reproduce locally:</strong> <span class="mono">./run.sh</span> compiles both versions and
       prints the runtime and constant-fold signals. Source and README on
       <a id="repo-link" href="#">GitHub</a>.</p>
@@ -132,23 +144,25 @@
   }
   function setBadge(id, val) {
     var el = document.getElementById(id);
-    if (val === true)  { el.className = 'badge ok';  el.textContent = '== null → true ✓'; }
-    else if (val === false) { el.className = 'badge bad'; el.textContent = '== null → false ✗'; }
+    if (val === true)  { el.className = 'badge ok';  el.textContent = '→ true ✓'; }
+    else if (val === false) { el.className = 'badge bad'; el.textContent = '→ false ✗'; }
   }
   function poll() {
     var a = parse(readFrame('f-2121'));
     var b = parse(readFrame('f-2131'));
+    var c = parse(readFrame('f-fixed'));
     if (a !== null) setBadge('b-2121', a);
     if (b !== null) setBadge('b-2131', b);
+    if (c !== null) setBadge('b-fixed', c);
     var v = document.getElementById('verdict');
-    if (a !== null && b !== null) {
-      if (a === true && b === false) {
+    if (a !== null && b !== null && c !== null) {
+      if (a === true && b === false && c === true) {
         v.className = 'verdict confirmed';
-        v.innerHTML = 'Regression reproduced - GWT 2.13.1 answers <span class="mono">false</span> where 2.12.1 answers <span class="mono">true</span>.' +
-          '<small>Same source, same optimized compile. The absent property (undefined) leaks past the null check on 2.13.</small>';
+        v.innerHTML = 'Regression reproduced on GWT 2.13.1 &mdash; and fixed by the proposed one-line patch.' +
+          '<small>Same source, same optimized compile: 2.12.1 → true, 2.13.1 → false (undefined leaks past the null check), 2.13.1 + fix → true again.</small>';
       } else {
         v.className = 'verdict';
-        v.innerHTML = 'Results: 2.12.1 = <span class="mono">' + a + '</span>, 2.13.1 = <span class="mono">' + b + '</span>.';
+        v.innerHTML = 'Results: 2.12.1 = <span class="mono">' + a + '</span>, 2.13.1 = <span class="mono">' + b + '</span>, 2.13.1+fix = <span class="mono">' + c + '</span>.';
       }
       return;
     }
