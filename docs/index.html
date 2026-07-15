@@ -45,8 +45,25 @@
   .badge.wait { background: #eef1f4; color: var(--muted); }
   .badge.ok { background: var(--ok-bg); color: var(--ok); }
   .badge.bad { background: var(--bad-bg); color: var(--bad); }
-  iframe { width: 100%; height: 72px; border: 0; display: block; background: #fff; }
-  .framenote { padding: 8px 16px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
+  .panel .body { padding: 14px 14px 8px; }
+  .expr {
+    margin: 0 0 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; background: #eef1f4; border-left: 3px solid #aeb8c2; border-radius: 4px;
+    padding: 7px 10px; color: #2a3540; white-space: pre-wrap; overflow: hidden;
+  }
+  .out {
+    margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; line-height: 1.5; background: var(--code-bg); color: var(--code-ink);
+    border-radius: 4px; padding: 7px 10px; overflow: hidden; word-break: break-word;
+  }
+  .out .prompt { color: #6b7785; }
+  .out .run { color: #8b97a3; }
+  .out .val-true  { color: #8ce7b0; font-weight: 700; }
+  .out .val-false { color: #ff9d8c; font-weight: 700; }
+  .out .note { color: #8b97a3; }
+  /* the iframe only runs the GWT app; it is moved offscreen, not shown */
+  iframe.runner { position: absolute; left: -9999px; top: 0; width: 320px; height: 60px; border: 0; }
+  .framenote { padding: 8px 14px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
 
   pre.code {
     background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
@@ -81,17 +98,29 @@
   <div class="grid">
     <div class="panel">
       <header><span class="ver">GWT 2.12.1</span><span class="badge wait" id="b-2121">waiting&hellip;</span></header>
-      <iframe id="f-2121" src="app/2.12.1/index.html" title="GWT 2.12.1 output"></iframe>
+      <div class="body">
+        <pre class="expr">getValue() == null</pre>
+        <div class="out" id="out-2121"><span class="prompt">&rsaquo;</span> <span class="run">running&hellip;</span></div>
+      </div>
+      <iframe class="runner" id="f-2121" src="app/2.12.1/index.html" title="GWT 2.12.1 output"></iframe>
       <div class="framenote">Baseline &mdash; expected <span class="mono">true</span>.</div>
     </div>
     <div class="panel">
       <header><span class="ver">GWT 2.13.1</span><span class="badge wait" id="b-2131">waiting&hellip;</span></header>
-      <iframe id="f-2131" src="app/2.13.1/index.html" title="GWT 2.13.1 output"></iframe>
+      <div class="body">
+        <pre class="expr">getValue() == null</pre>
+        <div class="out" id="out-2131"><span class="prompt">&rsaquo;</span> <span class="run">running&hellip;</span></div>
+      </div>
+      <iframe class="runner" id="f-2131" src="app/2.13.1/index.html" title="GWT 2.13.1 output"></iframe>
       <div class="framenote">Regressed &mdash; returns <span class="mono">false</span>.</div>
     </div>
     <div class="panel fixed">
       <header><span class="ver">2.13.1 + fix</span><span class="badge wait" id="b-fixed">waiting&hellip;</span></header>
-      <iframe id="f-fixed" src="app/2.13.1-fixed/index.html" title="GWT 2.13.1 patched output"></iframe>
+      <div class="body">
+        <pre class="expr">getValue() == null</pre>
+        <div class="out" id="out-fixed"><span class="prompt">&rsaquo;</span> <span class="run">running&hellip;</span></div>
+      </div>
+      <iframe class="runner" id="f-fixed" src="app/2.13.1-fixed/index.html" title="GWT 2.13.1 patched output"></iframe>
       <div class="framenote">Proposed patch &mdash; restored to <span class="mono">true</span>.</div>
     </div>
   </div>
@@ -138,24 +167,31 @@
     } catch (e) { return ''; }
   }
   function parse(t) {
-    if (/->\s*true/.test(t)) return true;
-    if (/->\s*false/.test(t)) return false;
-    return null;
+    var m = t.match(/->\s*(true|false)\s*(?:\(([^)]*)\))?/);
+    if (!m) return null;
+    return { val: m[1] === 'true', note: (m[2] || '').replace(/^(CORRECT|BUG):\s*/i, '') };
   }
   function setBadge(id, val) {
     var el = document.getElementById(id);
     if (val === true)  { el.className = 'badge ok';  el.textContent = '→ true ✓'; }
     else if (val === false) { el.className = 'badge bad'; el.textContent = '→ false ✗'; }
   }
+  function renderOut(id, r) {
+    var el = document.getElementById('out-' + id);
+    var cls = r.val ? 'val-true' : 'val-false';
+    el.innerHTML = '<span class="prompt">&rsaquo;</span> <span class="' + cls + '">' + r.val + '</span>'
+      + (r.note ? ' <span class="note">// ' + r.note + '</span>' : '');
+  }
   function poll() {
     var a = parse(readFrame('f-2121'));
     var b = parse(readFrame('f-2131'));
     var c = parse(readFrame('f-fixed'));
-    if (a !== null) setBadge('b-2121', a);
-    if (b !== null) setBadge('b-2131', b);
-    if (c !== null) setBadge('b-fixed', c);
+    if (a) { setBadge('b-2121', a.val); renderOut('2121', a); }
+    if (b) { setBadge('b-2131', b.val); renderOut('2131', b); }
+    if (c) { setBadge('b-fixed', c.val); renderOut('fixed', c); }
     var v = document.getElementById('verdict');
-    if (a !== null && b !== null && c !== null) {
+    if (a && b && c) {
+      a = a.val; b = b.val; c = c.val;
       if (a === true && b === false && c === true) {
         v.className = 'verdict confirmed';
         v.innerHTML = 'Regression reproduced on GWT 2.13.1 &mdash; and fixed by the proposed one-line patch.' +
