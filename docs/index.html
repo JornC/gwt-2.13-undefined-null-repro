@@ -88,9 +88,9 @@
 <div class="wrap">
   <h1>GWT 2.13: <span class="mono">undefined</span> leaks past <span class="mono">== null</span></h1>
   <p class="lede">
-    The identical module, compiled under two GWT versions. A native-JsType primitive field holds an
-    absent JS property (<span class="mono">undefined</span>); its autoboxed value is null-checked.
-    The optimized compile disagrees on the answer.
+    The same module under three builds. A native-JsType primitive field holds an absent JS property
+    (<span class="mono">undefined</span>); its autoboxed value is null-checked. The optimized compile
+    disagrees on the answer.
   </p>
 
   <div id="verdict" class="verdict pending">
@@ -148,26 +148,23 @@
   </p>
 
   <div class="foot">
-    <p><strong>Root cause:</strong> GWT
+    <p><strong>Root cause:</strong>
       <a href="https://github.com/gwtproject/gwt/pull/10165">PR&nbsp;#10165</a>
-      (commit&nbsp;<span class="mono">b5155aa</span>) made <span class="mono">JsUtils.uncheckedCast</span>
-      inlinable. The autobox <span class="mono">double&rarr;Double</span> runs through it, so after
-      inlining the optimizer proves the boxed value is non-null (it came from a primitive) and
-      constant-folds <span class="mono">boxed == null</span> to <span class="mono">false</span>.
-      The <span class="mono">undefined</span> that arrived from JS is never normalized to null.
-      Only the optimized/production compile is affected; SuperDevMode is not.</p>
-    <p><strong>Fix in your code:</strong> declare the native-overlay field as the boxed type
-      (<span class="mono">Double</span>, not <span class="mono">double</span>) so it is read as a
-      nullable reference.</p>
-    <p><strong>Proposed compiler fix</strong> (third panel above): a one-line guard in
-      <span class="mono">JUnsafeTypeCoercion.getType()</span> that stops strengthening a coerced
-      <em>primitive</em> to non-null, so undefined-bearing values stay nullable &mdash; while keeping
-      #10165's inlining. That panel is the repro compiled with a
+      (<span class="mono">b5155aa</span>) made <span class="mono">JsUtils.uncheckedCast</span> inlinable.
+      The <span class="mono">double&rarr;Double</span> autobox runs through it, so once inlined the
+      optimizer types the boxed value non-null and folds <span class="mono">boxed == null</span> to
+      <span class="mono">false</span> &mdash; the JS <span class="mono">undefined</span> is never
+      normalized. Optimized compile only; SuperDevMode is fine.</p>
+    <p><strong>Workaround:</strong> box the field &mdash; <span class="mono">Double</span>, not
+      <span class="mono">double</span>.</p>
+    <p><strong>Proposed fix</strong> (third panel): a one-line guard in
+      <span class="mono">JUnsafeTypeCoercion.getType()</span> skipping the non-null strengthening for a
+      coerced primitive, keeping #10165's inlining. That panel is the repro built with a
       <span class="mono">gwt-dev-2.13.1</span> jar carrying only this
-      <a href="src/JUnsafeTypeCoercion.patch">patch</a>; it answers <span class="mono">true</span> again.</p>
-    <p><strong>Reproduce locally:</strong> <span class="mono">./run.sh</span> compiles both versions and
-      prints the runtime and constant-fold signals. Source and README on
-      <a id="repo-link" href="#">GitHub</a>.</p>
+      <a href="src/JUnsafeTypeCoercion.patch">patch</a>.</p>
+    <p><strong>Locally:</strong> <span class="mono">./run.sh</span> compiles all builds and prints the
+      signals. <a href="https://github.com/JornC/gwt-2.13-undefined-null-repro">Source &amp; README</a>.</p>
+    <p class="credit">Found and reported with <a href="https://claude.com/claude-code">Claude Code</a>.</p>
   </div>
 </div>
 
