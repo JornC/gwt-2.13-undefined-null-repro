@@ -76,6 +76,13 @@
   .hl-typ { color: #7dcfff; }
   .sources { text-align: center; font-size: 13px; color: var(--muted); margin: 16px 0 0; }
   .sources a { margin: 0 2px; }
+  .workaround {
+    margin: 22px 0 0; padding: 14px 16px; background: #edf6ef;
+    border: 1px solid #cfe6d6; border-left: 3px solid var(--ok); border-radius: 8px;
+  }
+  .workaround strong { color: var(--ok); font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .workaround p { margin: 6px 0 0; font-size: 14px; }
+  .workaround p.muted { color: var(--muted); font-size: 13px; }
   .filetab { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
   .filetab a { color: var(--muted); }
   .expected { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
@@ -136,6 +143,17 @@
     &middot;
     <a href="https://github.com/JornC/gwt-2.13-undefined-null-repro">repository</a>
   </p>
+
+  <div class="workaround">
+    <strong>Workaround</strong>
+    <p>Box the field - declare it <span class="mono">Double</span>, not <span class="mono">double</span>.
+      It is then read as a nullable reference, so the <span class="mono">undefined</span>&rarr;<span class="mono">null</span>
+      coercion is preserved. Correct at every optimization level; this is the real fix.</p>
+    <p class="muted">Compiling with <span class="mono">-optimize&nbsp;1</span> or lower also avoids it (the
+      folding pass never runs), but that disables nearly all optimization &mdash; not a production option.
+      <span class="mono">-optimize&nbsp;2</span> through <span class="mono">9</span> all reproduce the bug, so
+      lowering to <span class="mono">8</span> does <em>not</em> help.</p>
+  </div>
 
   <h2>The code, in full</h2>
   <p class="filetab"><a href="https://github.com/JornC/gwt-2.13-undefined-null-repro/blob/main/src/main/java/repro/NativeObj.java">NativeObj.java</a></p>
