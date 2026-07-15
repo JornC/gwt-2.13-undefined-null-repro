@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>repro</groupId>
+  <artifactId>gwt-undefined-null-repro</artifactId>
+  <version>1.0</version>
+  <packaging>jar</packaging>
+
+  <!--
+    Minimal reproducer for the GWT 2.13 regression where `undefined` leaks past a
+    `== null` check when a native-JsType primitive field is autoboxed.
+    The GWT version is a single property - swap it to see the behavior flip.
+  -->
+  <properties>
+    <gwt.version>2.13.1</gwt.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.gwtproject</groupId>
+      <artifactId>gwt-user</artifactId>
+      <version>${gwt.version}</version>
+    </dependency>
+    <!-- gwt-dev (the compiler) as a normal dependency so copy-dependencies grabs it + transitives -->
+    <dependency>
+      <groupId>org.gwtproject</groupId>
+      <artifactId>gwt-dev</artifactId>
+      <version>${gwt.version}</version>
+    </dependency>
+  </dependencies>
+</project>
